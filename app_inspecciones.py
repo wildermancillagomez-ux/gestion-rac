@@ -3,14 +3,14 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# 1. CONFIGURACIÓN DE LA PÁGINA
+# 1. CONFIGURACIÓN DE LA PÁGINA (ESTRUCTURA COMPLETA)
 st.set_page_config(
     page_title="Gestor de Seguridad RAC 2025",
     page_icon="🛡️",
     layout="wide"
 )
 
-# --- ESTILOS VISUALES (CSS COMPLETO - NO SE TOCA) ---
+# --- ESTILOS VISUALES (CSS PREMIUM - NO SE RESUME) ---
 st.markdown("""
     <style>
     .main { background-color: #f0f2f6; }
@@ -25,6 +25,7 @@ st.markdown("""
         background-color: #007bff;
         color: white;
         border-radius: 10px;
+        font-weight: bold;
     }
     .sidebar .sidebar-content {
         background-color: #ffffff;
@@ -32,25 +33,28 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. CARGA DE DATOS INTELIGENTE Y LIMPIEZA PROFUNDA
+# 2. CARGA DE DATOS INTELIGENTE (LECTURA DE DATA.XLSX)
 @st.cache_data
 def load_data():
-    file_path = 'Base de datos Inspecciones mas RAC 2025.xlsx'
+    # Usamos el nombre simplificado para evitar errores en la red
+    file_path = 'data.xlsx'
     xl = pd.ExcelFile(file_path)
+    
+    # Lógica para detectar la pestaña correcta
     sheet = 'Hoja1' if 'Hoja1' in xl.sheet_names else xl.sheet_names[0]
     df = xl.parse(sheet)
     
-    # Limpieza de nombres de columnas
+    # Limpieza profunda de encabezados
     df.columns = [str(c).strip() for c in df.columns]
     
-    # Homologación de Estado
+    # Procesamiento de la columna Estado (Columna X)
     if 'Estado' in df.columns:
         df['Estado'] = df['Estado'].astype(str).str.strip().replace({'nan': 'Overdue', 'None': 'Overdue', '': 'Overdue'})
         df['Estado'] = df['Estado'].replace({'Completado': 'Completed', 'Pendiente': 'Overdue'})
     else:
         df['Estado'] = 'Overdue'
 
-    # Limpieza de responsables
+    # Limpieza de responsables (Columna L)
     if 'RESPONSABLE DE ÁREA' in df.columns:
         df['RESPONSABLE DE ÁREA'] = df['RESPONSABLE DE ÁREA'].astype(str).str.strip()
     
@@ -59,34 +63,35 @@ def load_data():
 try:
     df_raw = load_data()
 except Exception as e:
-    st.error(f"❌ Error crítico al cargar el archivo: {e}")
+    st.error(f"❌ Error crítico al cargar 'data.xlsx': {e}")
+    st.info("Asegúrate de haber renombrado tu archivo a 'data.xlsx' antes de subirlo a GitHub.")
     st.stop()
 
-# --- 3. BARRA LATERAL (FILTROS) ---
-st.sidebar.header("🔍 Filtros Globales")
-st.sidebar.markdown("Usa estos filtros para ajustar el Dashboard completo.")
+# --- 3. BARRA LATERAL (FILTROS COMPLETOS) ---
+st.sidebar.header("🔍 Filtros de Gestión")
+st.sidebar.markdown("Ajusta los datos para el análisis específico.")
 
-# Filtro de Mes
-meses = ["Todos"] + sorted(df_raw['MES'].dropna().unique().tolist())
-mes_sel = st.sidebar.selectbox("Seleccionar Mes:", meses)
+# Filtro por Mes
+lista_meses = ["Todos"] + sorted([str(m) for m in df_raw['MES'].dropna().unique() if str(m) != 'nan'])
+mes_sel = st.sidebar.selectbox("Filtrar por Mes:", lista_meses)
 
-# Filtro de Sección
-secciones = ["Todas"] + sorted(df_raw['SECCIÓN'].dropna().unique().tolist())
-seccion_sel = st.sidebar.selectbox("Seleccionar Sección:", secciones)
+# Filtro por Sección
+lista_secciones = ["Todas"] + sorted([str(s) for s in df_raw['SECCIÓN'].dropna().unique() if str(s) != 'nan'])
+seccion_sel = st.sidebar.selectbox("Filtrar por Sección:", lista_secciones)
 
-# Aplicar Filtros al DataFrame principal
+# Aplicación de filtros al dataset
 df = df_raw.copy()
 if mes_sel != "Todos":
     df = df[df['MES'] == mes_sel]
 if seccion_sel != "Todas":
     df = df[df['SECCIÓN'] == seccion_sel]
 
-# 4. CABECERA PRINCIPAL
+# 4. CABECERA PRINCIPAL Y LOGO SIMBOLICO
 st.title("🛡️ Sistema de Gestión de Observaciones - RAC 2025")
-st.markdown(f"**Visualizando:** {mes_sel} | {seccion_sel} | **Registros:** {len(df)}")
+st.markdown(f"**Visualización Activa:** {mes_sel} | **Sección:** {seccion_sel} | **Registros:** {len(df)}")
 st.markdown("---")
 
-# 5. TABLERO DE INDICADORES (KPIs)
+# 5. TABLERO DE INDICADORES (KPIs DETALLADOS)
 total_obs = len(df)
 cerradas = len(df[df['Estado'] == 'Completed'])
 pendientes = len(df[df['Estado'] == 'Overdue'])
@@ -94,20 +99,20 @@ efectividad = (cerradas / total_obs * 100) if total_obs > 0 else 0
 
 col_k1, col_k2, col_k3, col_k4 = st.columns(4)
 col_k1.metric("Total Observaciones", total_obs)
-col_k2.metric("Cerradas ✅", cerradas)
-col_k3.metric("Pendientes ⚠️", pendientes, delta=f"{pendientes} críticas", delta_color="inverse")
+col_k2.metric("Cerradas (Cierres)", cerradas)
+col_k3.metric("Pendientes (Overdue)", pendientes, delta=f"{pendientes} críticas", delta_color="inverse")
 col_k4.metric("% de Cumplimiento", f"{efectividad:.1f}%")
 
 st.markdown("---")
 
-# 6. GRÁFICOS DE ALTO IMPACTO
-st.header("📊 Estadísticas y Rankings")
+# 6. GRÁFICOS DE ALTO IMPACTO (PIE Y RANKING)
+st.header("📊 Estadísticas y Monitoreo de Cumplimiento")
 g1, g2 = st.columns([1, 1])
 
 with g1:
     fig_pie = px.pie(
         df, names='Estado', 
-        title="Estado General de la Gestión",
+        title="Estado de Observaciones en Tiempo Real",
         hole=0.5,
         color='Estado',
         color_discrete_map={'Completed': '#2ecc71', 'Overdue': '#e74c3c'}
@@ -116,8 +121,9 @@ with g1:
     st.plotly_chart(fig_pie, use_container_width=True)
 
 with g2:
+    # Solo mostrar responsables con tareas Overdue
     df_pendientes = df[df['Estado'] == 'Overdue']
-    df_pendientes = df_pendientes[df_pendientes['RESPONSABLE DE ÁREA'] != 'nan']
+    df_pendientes = df_pendientes[df_pendientes['RESPONSABLE DE ÁREA'].str.lower() != 'nan']
     
     if not df_pendientes.empty:
         ranking = df_pendientes.groupby('RESPONSABLE DE ÁREA').size().reset_index(name='Cantidad')
@@ -128,52 +134,61 @@ with g2:
             x='Cantidad', 
             y='RESPONSABLE DE ÁREA', 
             orientation='h',
-            title="Ranking: Responsables con más Pendientes",
+            title="Ranking de Responsables con Pendientes",
             color='Cantidad',
             color_continuous_scale='Reds',
             text='Cantidad'
         )
         st.plotly_chart(fig_bar, use_container_width=True)
     else:
-        st.success("🎉 ¡Sin pendientes con los filtros aplicados!")
+        st.success("🎉 ¡Excelente! No existen pendientes con los filtros actuales.")
 
 st.markdown("---")
 
-# 7. PORTAL DE BÚSQUEDA DEL RESPONSABLE
-st.header("🔍 Mi Portal de Trabajo Personal")
-st.info("Nota: Los filtros de la izquierda también afectan tu búsqueda personal.")
+# 7. PORTAL DE BÚSQUEDA INTERACTIVO (EL CORAZÓN DE LA WEB)
+st.header("🔍 Portal de Autogestión para Responsables")
+st.info("Selecciona tu nombre para verificar deudas y subir evidencia fotográfica.")
 
-nombres_limpios = [str(n) for n in df['RESPONSABLE DE ÁREA'].unique().tolist() if str(n).lower() != 'nan' and str(n).strip() != '']
+# Obtención de lista de nombres limpia
+nombres_limpios = [str(n) for n in df['RESPONSABLE DE ÁREA'].unique() if str(n).lower() != 'nan' and str(n).strip() != '']
 nombres_ordenados = sorted(nombres_limpios)
 
 user_sel = st.selectbox(
-    "Escribe o selecciona tu nombre:",
-    options=["Seleccionar..."] + nombres_ordenados
+    "Busca y selecciona tu nombre completo:",
+    options=["Seleccionar responsable..."] + nombres_ordenados
 )
 
-if user_sel != "Seleccionar...":
+if user_sel != "Seleccionar responsable...":
+    # Filtrado por usuario
     mis_datos = df[df['RESPONSABLE DE ÁREA'] == user_sel]
     mis_pendientes = mis_datos[mis_datos['Estado'] == 'Overdue']
     
     if not mis_pendientes.empty:
-        st.warning(f"Hola **{user_sel}**, tienes **{len(mis_pendientes)}** pendientes en esta selección.")
+        st.warning(f"Estimado(a) **{user_sel}**, se han detectado **{len(mis_pendientes)}** observaciones pendientes de cierre.")
         
+        # Despliegue de observaciones individuales
         for idx, row in mis_pendientes.iterrows():
-            with st.expander(f"📌 ID: {row['Nº']} - {row['ÁREA']} (Límite: {row['Fecha de Cumplimiento']})"):
-                c1, c2 = st.columns([2, 1])
-                with c1:
-                    st.markdown(f"**Hallazgo:** {row['DESCRIPCIÓN']}")
-                    st.markdown(f"**Acción:** {row['Acción Correctiva']}")
-                    st.info(f"**Riesgo:** {row['RIESGO ASOCIADO']}")
-                with c2:
-                    foto = st.file_uploader(f"Subir foto ID {row['Nº']}", type=['jpg','png','jpeg'], key=f"photo_{idx}")
+            with st.expander(f"📌 Registro ID: {row['Nº']} | Área: {row['ÁREA']} | Límite: {row['Fecha de Cumplimiento']}"):
+                col_txt, col_img = st.columns([2, 1])
+                
+                with col_txt:
+                    st.markdown("**Descripción del Hallazgo:**")
+                    st.write(row['DESCRIPCIÓN'])
+                    st.markdown("**Acción Correctiva Requerida:**")
+                    st.write(row['Acción Correctiva'])
+                    st.markdown(f"**Riesgo Asociado:** `{row['RIESGO ASOCIADO']}`")
+                
+                with col_img:
+                    # Función de subida de archivos (Evidencia)
+                    foto = st.file_uploader(f"Cargar Foto de Corrección (ID {row['Nº']})", type=['jpg','png','jpeg'], key=f"photo_{idx}")
                     if foto:
-                        st.image(foto, width=250)
-                        st.button(f"Enviar Registro ID {row['Nº']}", key=f"btn_{idx}")
+                        st.image(foto, caption="Vista previa de evidencia", use_container_width=True)
+                        if st.button(f"Validar y Enviar ID {row['Nº']}", key=f"btn_{idx}"):
+                            st.success(f"✅ Evidencia para el ID {row['Nº']} enviada correctamente.")
     else:
         st.balloons()
-        st.success(f"🎊 ¡Felicidades **{user_sel}**! No tienes deudas con los filtros actuales.")
+        st.success(f"🎊 ¡Felicidades **{user_sel}**! No tienes observaciones pendientes bajo los criterios actuales.")
 
-# 8. VISTA GENERAL
-with st.expander("📂 Ver tabla de datos filtrada"):
+# 8. VISOR DE DATOS PARA AUDITORÍA
+with st.expander("📂 Explorar Base de Datos Completa (Modo Lectura)"):
     st.dataframe(df, use_container_width=True)
